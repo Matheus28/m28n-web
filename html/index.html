@@ -145,7 +145,7 @@ m28n deploy
 m28n rollback
 </code></pre>
 
-Using the JavaScript SDK:
+Using the JavaScript SDK to grab a server IP:
 <pre><code class="html">&lt;script src="https://c.n.m28.io/sdk.js"&gt;&lt;/script&gt;
 &lt;script&gt;
 // The SDK is used to provide us load balanced servers in a smarter way
@@ -191,6 +191,14 @@ m28n.findServerPreference("my-project-endpoint", function(err, servers){
 });
 &lt;/script&gt;
 </code></pre>
+
+You can also use our DNS resolver to find a random server, but this won't do proper latency testing,
+so it should only be used for web servers and where you can't control how the client finds the server:
+
+<pre><code class="bash">$ curl my-project-endpoint.r.m28n.net
+Hello World
+</code></pre>
+
 <h2>Documentation</h2>
 
 <h3>cli</h3>
