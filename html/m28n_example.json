@@ -1,0 +1,204 @@
+// This is the list of possible and default values for m28n.json
+//
+// The default values are very reasonable, but you might need to change them as your project evolves
+//
+{
+	// Project identifier
+	// *NEVER* change this after putting your project name in there
+	// You'll create a project under that name, that all servers created by this file are assigned to
+	// Once you update your project, we need the same project name to get rid of the old servers
+	"project": "my-project",
+	
+	// What to run in bash to start up your server
+	// You might want to run an auxiliary .sh to set things up
+	"run": "./my-executable",
+	
+	// Which files and folder to put in your server package
+	// Try to put the minimum possible to get your server to run,
+	// as they'll have to download these files before running
+	"package": [
+		"my-executable"
+	],
+	
+	// Every server is put in this endpoint
+	// Note: endpoints are optional, you might not need them if whatever you are creating isn't supposed to be reachable
+	// Note: endpoints are claimed on a first-come first-serve basis and are assigned to your project when you first
+	//       deploy a version using it. If there are no versions active using an endpoint, someone else might claim
+	//       it for them.
+	// Note: this also creates a DNS endpoint at <endpoint>.r.n.m28.io, you can use that for web servers
+	"endpoint": "my-endpoint", // Optional
+	
+	// What TCP ports to health check using HTTP (expecting a 2xx response)
+	// Note: this is *extremely* recommended, otherwise there is little way to tell whether
+	//       the server has crashed or not
+	"httpHealthCheck": [ 80 ], // Required
+	
+	// Whether to use the default supervisor, if you don't use it, you will need to submit your own load
+	// metrics to the api.
+	// You should call the following endpoint at most once per second, with an exponential backoff if
+	// you don't get a 200 response code:
+	// 
+	// PUT /service/$M28N_SERVICE/server/$M28N_SERVER_ID
+	// Host: api.n.m28.io
+	// Authorization: ServerToken $M28N_SERVICE_SECRET
+	// Content-Type: application/json
+	//
+	// {"load": ? }
+	//
+	"useDefaultSupervisor": true, // Default: true
+	
+	// minLoad is the load in which we start scaling down to increase our load
+	// maxLoad is the load in which we start scaling up to decrease our load
+	// We take the average of all enabled servers to decide
+	"minLoad": 0.6, // Default: 0.6
+	"maxLoad": 0.8, // Default: 0.8
+	
+	// Above this load, we won't send clients to a server anymore
+	// This is a soft limit, as we might've already sent a few clients by the
+	// time we get the new load measurement.
+	// Ideally we wouldn't ever hit this as we're going to be scaling up, however
+	// if something happens with one of the regions and they can't scale up,
+	// this lets us send more clients to other regions.
+	"cutoffLoad": 0.9,
+	
+	// Behavior when the project is updated:
+	// - "shared": The endpoint will still be pointing to old servers, along with new servers.
+	//             New servers will have preference, and old servers are going to be slowly shut down.
+	//             This works well if versions are somewhat compatible, and it's the recommended method.
+	//
+	// - "clear": Endpoints are cleared and only point to new servers.
+	//            We'll only flip the switch once we have minServers in each region you specified
+	//            Until then, we're only going to be pointing to the old version
+	//
+	"endpointBehaviorOnUpdate": "share",
+	
+	// Minimum time in minutes that the server has between having its "isEnabled" flag set to false,
+	// and it being destroyed. This allows you to control how long clients can still be connected before
+	// being forcibly disconnected.
+	//
+	// You can query the current state of the server by sending a request to:
+	// https://api.n.m28.io/service/$M28N_SERVICE/server/$M28N_SERVER_ID/isEnabled
+	// If the query succeeds, it'll return: { isEnabled: true/false, lastDisabledAt: unix time, }
+	//
+	// It is recommended that you query once per second, and if the query fails, just wait until
+	// the next second (as in, don't retry the failed query).
+	//
+	// If the server is disabled, you should:
+	// - Disconnect clients as they die
+	// - Refuse new connections
+	//
+	// We recommend a higher value than the default, around 30 minutes is optimal.
+	"shutdownTimeout": 20, // Default: 20, min 0
+	
+	// Average time in minutes after we disable a server that we can still go back on our decision
+	// and enable it again. If we don't enable it within this time, we'll most likely destroy it
+	//
+	// Note that when a server is enabled again you can EITHER:
+	// - Continue disconnecting clients that were in the game that ended
+	//   and create a new game for new clients (best method)
+	// - Start accepting connections into the old arena again
+	//
+	// See "shutdownTimeout" too
+	"reenableTimeout": 10, // Default: 10, min 0
+	
+	// Minimum and maximum number of minutes to keep old servers around after an update is released
+	// Servers will get disabled and eventually destroyed after a random number of minutes within this
+	// interval after an update.
+	// You want a range of values because shutting down all servers at once is very disruptive and
+	// you might not be able to scale up the new version in time.
+	// Note that after an update, old servers never scale up, but do scale down, so even with a range
+	// of 0-600 minutes, way more than half of them are already going to be gone by minute 300.
+	//
+	// 5~35 is a good combination
+	// 5~600 is pretty slow but also very non-disruptive.
+	"updateKeepAliveMin": 5, // Default: 5
+	"updateKeepAliveMax": 35, // Default: 35
+	
+	// Number of servers to keep on stand by in case we need to scale up
+	// This makes scaling up a lot faster, since we don't have to wait for the server to
+	// boot up and everything, but it costs more since we have N servers per region just
+	// sitting there
+	"standbyServers": 0, // Default: 0
+	
+	// The standard "size" of the server to create for us. Minimum specs are:
+	// 0 = 1 CPU(s), 1 GB Memory, 1 TB bandwidth
+	// 1 = 1 CPU(s), 2 GB Memory, 2 TB bandwidth
+	// 2 = 2 CPU(s), 4 GB Memory, 3 TB bandwidth
+	// Also note that different providers might provide different CPU models, so
+	// this is at best an approximation of the amount of computing power you have.
+	// It's recommended to just scale the game arena size by the number of players currently
+	// connected, and we'll handle creating more servers as CPU usage grows
+	"serverSize": 1, // Default: 1
+	
+	// Linux distribution to use
+	// Available values:
+	// - ubuntu-14.04
+	// - ubuntu-16.04
+	//
+	// More values can be added, just ask
+	"distro": "ubuntu-16.04", // Default: ubuntu-16.04
+	
+	// Minimum number of servers per region
+	// You can increase this to ensure more availability, but it's usually not needed
+	"minServers": 1, // Default: 1
+	
+	// Minimum number of servers while warming up
+	// This can overriden on a per item inside the matrix
+	"warmUpMinServers": 1, // Default: 1
+	
+	// Whether to enable vultr's DDOS protection
+	"vultrDDOSProtection": false, // Default: false
+	
+	// CloudFlare zone associated with this project
+	// When you deploy a new version, this will flip the zone into development mode
+	// and clear the cache
+	// You must first configure a CloudFlare api key by running "m28n cloudflare"
+	"cloudFlareZone": null,
+	
+	// Arbitrary tags that will be put in the environment variable M28N_SERVER_TAGS
+	"tags": { // Default: {}
+		"cool": "normal"
+	},
+	
+	// Regions in which servers are created in, for every service we define in the matrix,
+	// we'll create servers in those regions
+	"regions": [ // Required
+		"linode-dallas",
+		"vultr-chicago",
+		[
+			// Create servers in fremont, but if load increases enough,
+			// also start creating servers in seatle
+			"linode-fremont",
+			"vultr-seattle"
+		],
+		[
+			// Create servers in frankfurt, but while total load is >= 3,
+			// also start create and use servers in london
+			{ "region": "vultr-frankfurt" },
+			{ "region": "linode-london", "minLoad": 3 }
+		]
+	],
+	
+	// You can create several different types of servers, with different endpoints
+	// This matrix specifies the different configurations of servers to create
+	"matrix": [ // Default: [ { "id": "default" } ]
+		{ // Create normal servers, this line is required, otherwise we'd only have extra cool servers
+			"id": "normal", // Unique id just so we can keep track of them across updates
+			"endpoint": "my-normal-endpoint"
+		},
+		
+		{ // Create extra cool servers
+			"id": "cool",
+			"endpoint": "my-cool-endpoint",
+			"tags": { "cool": "extra" },
+			// Change which regions we create servers in, instead of inheriting them
+			// This means that this endpoint only has servers in the region vultr-seattle
+			"regions": [ "vultr-seattle" ]
+		}
+	]
+	
+	// From the code in this example, we have the following endpoints:
+	// my-endpoint = All normal or cool servers
+	// my-normal-endpoint = All normal servers
+	// my-cool-endpoint = All cool servers
+}

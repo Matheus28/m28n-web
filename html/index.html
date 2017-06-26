@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>m28n</title>
+
+<link rel="stylesheet" href="styles/monokai-sublime.css">
+<script src="highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<style>
+
+@import url(https://fonts.googleapis.com/css?family=Open+Sans);
+
+html {
+	background-color: #fafafa
+}
+
+body{
+	font-family:Open Sans,Arial;
+    color: #555;
+    font-size: 16px;
+    margin: 2em auto;
+    max-width: 1150px;
+    padding: 1em;
+    line-height: 1.4;
+    text-align: justify
+}
+
+a, a:visited {
+	color: #55A;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+a:hover, a:focus {
+	color: #228;
+}
+
+h1, h2, h3 {
+	line-height:1.2;
+}
+
+@media print{
+	body{
+		max-width: none
+	}
+}
+
+pre code {
+	border-radius: 5px !important;
+	padding: 14px !important;
+}
+
+.single-line-code {
+	border-radius: 5px !important;
+	background-color: #23241f;
+	color: #f8f8f2;
+	font-family: monospace;
+	padding: 3px 8px;
+}
+
+</style>
+</head>
+<body>
+<h1>m28n</h1>
+<aside>Magic server deployment, auto scaling and load balancing as a service</aside>
+
+<h2>Registration</h2>
+<p>Please note that m28n is currently available by invite only, please send an email to <span class="single-line-code">n@m28.io</span> to get invited.</p>
+
+<h2>Why not just rent servers from cloud provider X?</h2>
+
+<p>There are two major classes of cloud server providers:</p>
+<ul>
+<li>Those that provide not only servers, but a platform of solutions (AWS, Azure, Google Cloud Platform, etc). They have a built in premium price in their services, and for bandwidth intensive applications it might be prohibitely expensive. The cheapest listed bandwidth price on the providers mentioned is $0.050/GB.</li>
+<li>Smaller providers, that focus on providing servers, and a few more services (Linode, DigitalOcean, Vultr, etc). Their prices are excellent, providing an enormous bang for the buck (bandwidth at $0.005/GB), but at the moment, none of those listed offer autoscaling.</li>
+</ul>
+
+<p>We provide an server deployment solution that also takes care of autoscaling your servers and handling updates across your cluster. You provide us with API keys for the cloud providers you want to use (and we support), and we'll take care of managing them for you.</p>
+
+
+<h2>Usage</h2>
+Create a file called <span class="single-line-code">m28n.json</span> at the root directory of your project:
+<pre><code class="javascript">{
+	// Project identifier
+	"project": "my-project",
+	
+	// Identifier used for locating this project
+	// This also creates a DNS record pointing to all servers at my-project-endpoint.r.n.m28.io
+	// (useful for creating web servers, since the client can't use the sdk to find a server then)
+	"endpoint": "my-project-endpoint",
+		
+	// What ports we want to health check to make sure this server is still up
+	"httpHealthCheck": [ 80 ],
+	
+	// What to run once a server boots up
+	"run": "node project.js",
+	
+	// Which files to send to servers
+	"package": [
+		"project.js",
+	],
+	
+	// Where to create servers
+	"regions": [
+		"linode-fremont",
+		"vultr-seattle"
+	]
+}</code></pre>
+
+Our example node.js file <span class="single-line-code">project.js</span> has the following content:
+
+<pre><code class="javascript">const http = require("http");
+
+const server = http.createServer((req, res) => {
+	res.statusCode = 200;
+	res.setHeader('Content-Type', 'text/plain');
+	res.end('Hello World\n');
+});
+
+server.listen(80);
+</code></pre>
+
+Time to create servers for our project:
+
+<pre><code class="bash"># Install the cli
+npm install -g m28n-cli
+
+# Your API token
+export M28N_ACCOUNT_TOKEN=your_account_token
+
+# Set up your API keys for the regions you want to use
+m28n linode
+m28n vultr
+
+# Create the project
+m28n create my-project
+
+# Deploy! This is the only command you need to use afterwards
+m28n deploy
+
+# Want to rollback to a previous version?
+# Stop the deploy and point clients back to the old servers
+m28n rollback
+</code></pre>
+
+Using the JavaScript SDK:
+<pre><code class="html">&lt;script src="https://c.n.m28.io/sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+// The SDK is used to provide us load balanced servers in a smarter way
+// than just round-robin dns
+
+// This gives you one server per region, and it's up to you to pick one
+m28n.findServers("my-project-endpoint", function(err, servers){
+	if(err) throw err;
+	console.log(servers); // =>
+	// {
+	//     "linode-fremont": {
+	//         "id": "abc",
+	//         "ipv4": "1.2.3.4",
+	//         "ipv6": null
+	//     },
+	//     
+	//     "vultr-seattle": {
+	//         "id": "xyz",
+	//         "ipv4": "4.3.2.1",
+	//         "ipv6": null
+	//     }
+	// }
+});
+
+// If you want to do some transparent latency testing and get servers
+// ordered by latency:
+m28n.findServerPreference("my-project-endpoint", function(err, servers){
+	if(err) throw err;
+	console.log(servers); // =>
+	// [
+	//     {
+	//         "id": "xyz",
+	//         "ipv4": "4.3.2.1",
+	//         "ipv6": null
+	//     },
+	//     
+	//     {
+	//         "id": "abc",
+	//         "ipv4": "1.2.3.4",
+	//         "ipv6": null
+	//     }
+	// ]
+});
+&lt;/script&gt;
+</code></pre>
+<h2>Documentation</h2>
+
+<h3>cli</h3>
+<pre><code class="bash">m28n # Prints help
+m28n deploy # Deploys the current project
+m28n status # Prints the status of the current project
+m28n servers # Prints all servers associated with the current project
+m28n env &lt;env_json&gt; # Sets the environment variables that all servers use (write-only, useful for storing tokens)
+m28n create &lt;identifier&gt; # Creates a new project
+m28n version # Prints the current deployed version
+m28n rollback [version] # Rolls back the current version to another version, or to the previous version
+m28n linode # Changes the linode API key associated with the account
+m28n vultr # Changes the vultr API key associated with the account
+</code></pre>
+
+<h3>References</h3>
+<ul>
+	<li><a href="m28n_example.json">Example manifest file</a></li>
+</ul>
+</body>
+</html>

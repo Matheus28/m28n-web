@@ -1,0 +1,22 @@
+{
+	"project": "web",
+	"endpoint": "web",
+	"httpHealthCheck": [ 80 ],
+	
+	"minServers": 1,
+	"shutdownTimeout": 2,
+	"updateKeepAliveMin": 5,
+	"updateKeepAliveMax": 10,
+	"serverSize": 0,
+	
+	"run": "chmod +x run.sh && ./run.sh",
+	"package": [
+		"run.sh",
+		"html"
+	],
+	
+	"regions": [
+		"linode-fremont",
+		"vultr-seattle"
+	]
+}
